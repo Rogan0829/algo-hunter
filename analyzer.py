@@ -213,27 +213,31 @@ def analyze_product_name(product_name: str, target_keyword: str = "", category: 
     else:
         result["golden_keywords"] = []
     
-    # 등급
+    # 최적화 잠재력 % (100 - 현재점수)
+    potential = 100 - total
+    result["potential"] = potential
+    result["total_score"] = total
+
     if total >= 85:
-        result["grade"] = "S"
-        result["grade_desc"] = "최상위 노출 최적화 상태"
-        result["grade_color"] = "#00C851"
+        result["potential_color"] = "#00C851"
+        result["potential_desc"] = "이미 최적화된 상품명! 현재 상위 노출 유리"
+        result["status_label"] = "최적화 완료"
     elif total >= 70:
-        result["grade"] = "A"
-        result["grade_desc"] = "양호 — 소폭 개선으로 상위권 진입 가능"
-        result["grade_color"] = "#33b5e5"
+        result["potential_color"] = "#33b5e5"
+        result["potential_desc"] = f"소폭 개선으로 상위권 진입 가능 — 잠재력 {potential}% 남음"
+        result["status_label"] = "양호"
     elif total >= 55:
-        result["grade"] = "B"
-        result["grade_desc"] = "보통 — 개선 필요, 경쟁에서 밀릴 수 있음"
-        result["grade_color"] = "#ffbb33"
+        result["potential_color"] = "#ffbb33"
+        result["potential_desc"] = f"지금 수정하면 노출 잠재력 {potential}% 끌어올릴 수 있어요"
+        result["status_label"] = "개선 필요"
     elif total >= 40:
-        result["grade"] = "C"
-        result["grade_desc"] = "미흡 — 즉시 수정 권장"
-        result["grade_color"] = "#ff8800"
+        result["potential_color"] = "#ff8800"
+        result["potential_desc"] = f"⚠️ 지금 이 상품명으로 노출 기회 {potential}% 놓치는 중"
+        result["status_label"] = "즉시 수정"
     else:
-        result["grade"] = "D"
-        result["grade_desc"] = "위험 — 노출 심각하게 낮을 가능성"
-        result["grade_color"] = "#CC0000"
+        result["potential_color"] = "#CC0000"
+        result["potential_desc"] = f"🚨 노출 잠재력 {potential}% 낭비 중 — 즉시 수정 필요"
+        result["status_label"] = "위험"
     
     # 경쟁자 전략 팁 (카테고리별)
     result["competitor_strategy"] = get_category_tips(category)
