@@ -172,6 +172,24 @@ if submitted:
                     st.caption(f"{len(optimized)}자")
                 st.markdown("")
         
+        # 연관 키워드 추천 + 경쟁 강도 확인 링크
+        if result.get("golden_keywords"):
+            st.markdown("### 🏅 연관 키워드 추천")
+            st.caption("네이버 쇼핑 자동완성 기반 연관 키워드 — 클릭하면 경쟁 강도 직접 확인 가능!")
+            for gk in result["golden_keywords"]:
+                st.markdown(
+                    f'<div class="suggest-box">🔍 <b>{gk["keyword"]}</b>'
+                    f'&nbsp;&nbsp;<a href="{gk["naver_url"]}" target="_blank" style="color:#4af; font-size:12px;">네이버에서 확인 →</a></div>',
+                    unsafe_allow_html=True
+                )
+            st.markdown("")
+        elif target_keyword:
+            # 자동완성 실패시 직접 링크 제공
+            naver_url = f"https://search.shopping.naver.com/search/all?query={target_keyword}"
+            st.markdown("### 📊 경쟁 강도 확인")
+            st.markdown(f'<div class="tip-box">🔍 <a href="{naver_url}" target="_blank" style="color:#4af;">"{target_keyword}" 네이버 쇼핑에서 직접 확인하기 →</a></div>', unsafe_allow_html=True)
+            st.markdown("")
+
         # 경쟁 전략 팁
         st.markdown("### 🏆 카테고리 경쟁 전략")
         for tip in result["competitor_strategy"]:

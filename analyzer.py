@@ -4,6 +4,42 @@ Algo Hunter - 스마트스토어 알고리즘 최적화 분석기
 """
 
 import re
+import requests
+from urllib.parse import quote
+
+
+def get_naver_autocomplete(keyword: str) -> list:
+    """네이버 쇼핑 자동완성 키워드 (연관 키워드 추천용)"""
+    try:
+        url = f"https://ac.shopping.naver.com/ac?q={quote(keyword)}&st=2&r_format=json&r_enc=UTF-8&q_enc=UTF-8&nw=1&lm=20"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "ko-KR,ko;q=0.9",
+            "Referer": "https://shopping.naver.com"
+        }
+        resp = requests.get(url, headers=headers, timeout=5)
+        data = resp.json()
+        suggestions = []
+        if "items" in data:
+            for group in data["items"]:
+                for item in group:
+                    if item and isinstance(item, list) and item[0]:
+                        suggestions.append(item[0])
+        return suggestions[:10]
+    except Exception:
+        return []
+
+
+def get_golden_keywords(base_keyword: str, n: int = 5) -> list:
+    """황금 키워드 추천 (연관 키워드 목록 반환)"""
+    suggestions = get_naver_autocomplete(base_keyword)
+    results = []
+    for kw in suggestions:
+        results.append({
+            "keyword": kw,
+            "naver_url": f"https://search.shopping.naver.com/search/all?query={quote(kw)}"
+        })
+    return results[:n]
 
 # 네이버 쇼핑 금칙어 (실제 네이버 정책 기반)
 BANNED_WORDS = [
@@ -170,6 +206,12 @@ def analyze_product_name(product_name: str, target_keyword: str = "", category: 
     # 총점 계산
     total = sum(v["score"] for v in result["scores"].values())
     result["total_score"] = total
+
+    # 연관 키워드 추천 (타겟 키워드 있을 때만)
+    if target_keyword:
+        result["golden_keywords"] = get_golden_keywords(target_keyword)
+    else:
+        result["golden_keywords"] = []
     
     # 등급
     if total >= 85:
