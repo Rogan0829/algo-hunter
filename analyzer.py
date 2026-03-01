@@ -8,6 +8,60 @@ import requests
 from urllib.parse import quote
 
 
+def get_competitor_analysis(keyword: str, client_id: str = "", client_secret: str = "") -> dict:
+    """
+    네이버 쇼핑 API로 실제 경쟁 상품명 분석
+    - 상위 10개 상품명 패턴 분석
+    - 평균 길이, 공통 키워드, 특수문자 사용률 등
+    """
+    result = {"available": False, "data": {}}
+    if not client_id or not client_secret:
+        return result
+    try:
+        url = "https://openapi.naver.com/v1/search/shop.json"
+        headers = {
+            "X-Naver-Client-Id": client_id,
+            "X-Naver-Client-Secret": client_secret
+        }
+        params = {"query": keyword, "display": 10, "sort": "sim"}
+        resp = requests.get(url, headers=headers, params=params, timeout=5)
+        if resp.status_code != 200:
+            return result
+        items = resp.json().get("items", [])
+        if not items:
+            return result
+
+        titles = [re.sub(r'<[^>]+>', '', it.get("title", "")) for it in items]
+        lengths = [len(t) for t in titles]
+        avg_len = sum(lengths) / len(lengths) if lengths else 0
+        min_len, max_len = min(lengths), max(lengths)
+
+        # 공통 키워드 추출 (2회 이상 등장)
+        from collections import Counter
+        words = []
+        for t in titles:
+            words.extend(t.split())
+        common = [w for w, c in Counter(words).most_common(10) if c >= 2 and len(w) > 1]
+
+        # 특수문자 사용률
+        special_count = sum(1 for t in titles if re.search(r'[!@#\[\]()%&]', t))
+        special_rate = round(special_count / len(titles) * 100)
+
+        result["available"] = True
+        result["data"] = {
+            "titles": titles,
+            "avg_length": round(avg_len, 1),
+            "min_length": min_len,
+            "max_length": max_len,
+            "common_keywords": common[:5],
+            "special_char_rate": special_rate,
+            "count": len(titles)
+        }
+    except Exception:
+        pass
+    return result
+
+
 def get_naver_autocomplete(keyword: str) -> list:
     """네이버 쇼핑 자동완성 키워드 (연관 키워드 추천용)"""
     try:

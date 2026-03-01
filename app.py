@@ -4,7 +4,12 @@ Algo Hunter 🎯
 """
 
 import streamlit as st
-from analyzer import analyze_product_name, generate_optimized_name
+import os
+from analyzer import analyze_product_name, generate_optimized_name, get_competitor_analysis
+
+# 네이버 API 키 (환경변수 우선, 없으면 sidebar 입력)
+NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID", "")
+NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET", "")
 
 # 페이지 설정
 st.set_page_config(
@@ -80,9 +85,41 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 사이드바 - API 키 + 히스토리
+with st.sidebar:
+    st.markdown("### ⚙️ 설정")
+    naver_id = st.text_input("네이버 Client ID", value=NAVER_CLIENT_ID, type="password",
+                              help="네이버 개발자 API 키 입력 시 실제 경쟁 상품 분석 활성화")
+    naver_secret = st.text_input("네이버 Client Secret", value=NAVER_CLIENT_SECRET, type="password")
+    
+    if naver_id and naver_secret:
+        st.success("✅ 경쟁 분석 활성화됨")
+    else:
+        st.info("💡 네이버 API 키 입력 시 실제 경쟁 상품 비교 가능\n[발급하기](https://developers.naver.com/apps/#/register)")
+
+    st.markdown("---")
+    st.markdown("### 📋 분석 히스토리")
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    if st.session_state.history:
+        for h in reversed(st.session_state.history[-5:]):
+            color = h["color"]
+            st.markdown(
+                f'<div style="background:#1a1a2e; border-left:3px solid {color}; '
+                f'padding:6px 10px; margin:4px 0; border-radius:4px; font-size:12px;">'
+                f'<b style="color:{color}">{h["potential"]}%</b> '
+                f'<span style="color:#ccc">{h["name"][:20]}...</span></div>',
+                unsafe_allow_html=True
+            )
+        if st.button("히스토리 지우기"):
+            st.session_state.history = []
+    else:
+        st.caption("분석하면 여기에 기록됩니다")
+
 # 헤더
 st.markdown("# 🎯 Algo Hunter")
-st.markdown("**노출 막는 상품명, 10초 만에 잡아냅니다.**")
+st.markdown("**스마트스토어 전용 상품명 최적화 체크리스트**")
+st.markdown("<small style='color:#888'>네이버 쇼핑 로직 기반 · 실제 경쟁 상품 비교 · 무료 · 로그인 없음</small>", unsafe_allow_html=True)
 st.markdown("---")
 
 # ─────────────────────────────────────────────
@@ -115,11 +152,21 @@ def make_share_text(result, product_name):
 (로그인 없이 바로 사용!)"""
 
 
-def show_result(result, product_name, target_keyword):
+def show_result(result, product_name, target_keyword, naver_id="", naver_secret=""):
     """분석 결과 공통 출력 함수"""
     potential = result["potential"]
     color = result["potential_color"]
     total = result["total_score"]
+
+    # 히스토리 저장
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    st.session_state.history.append({
+        "name": product_name,
+        "potential": potential,
+        "score": total,
+        "color": color
+    })
 
     st.markdown(f"""
     <div class="score-box">
@@ -136,6 +183,43 @@ def show_result(result, product_name, target_keyword):
         st.markdown("**아래 텍스트를 복사해서 카페나 단톡방에 공유하세요!**")
         st.text_area("공유 텍스트", share_text, height=200, key=f"share_{hash(product_name)}")
         st.caption("💡 텍스트 선택 → Ctrl+A → Ctrl+C 로 전체 복사")
+    
+    # 🔥 경쟁 상품 실제 비교 (네이버 API 있을 때)
+    if target_keyword and naver_id and naver_secret:
+        with st.spinner("실제 경쟁 상품명 분석 중..."):
+            comp = get_competitor_analysis(target_keyword, naver_id, naver_secret)
+        if comp["available"]:
+            d = comp["data"]
+            st.markdown("### 🏆 실제 경쟁 상품 비교 (네이버 쇼핑 상위 노출)")
+            st.caption(f"'{target_keyword}' 검색 상위 {d['count']}개 상품명 실제 분석")
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                my_len = len(product_name)
+                avg_len = d["avg_length"]
+                diff = my_len - avg_len
+                icon = "✅" if abs(diff) <= 5 else ("⬆️" if diff > 0 else "⬇️")
+                st.metric("내 상품명 길이", f"{my_len}자", f"{diff:+.0f} vs 경쟁사 평균({avg_len}자)")
+            with c2:
+                st.metric("경쟁사 길이 범위", f"{d['min_length']}~{d['max_length']}자", f"평균 {avg_len}자")
+            with c3:
+                st.metric("경쟁사 특수문자 사용", f"{d['special_char_rate']}%", "낮을수록 좋음")
+            
+            if d["common_keywords"]:
+                st.markdown("**경쟁 상품 공통 키워드:**")
+                kw_html = " ".join([
+                    f'<span style="background:#1b2d1b; border:1px solid #44ff44; border-radius:12px; '
+                    f'padding:2px 10px; margin:2px; display:inline-block; color:#44ff44; font-size:13px;">{kw}</span>'
+                    for kw in d["common_keywords"]
+                ])
+                st.markdown(kw_html, unsafe_allow_html=True)
+                missing = [kw for kw in d["common_keywords"] if kw not in product_name]
+                if missing:
+                    st.warning(f"⚠️ 경쟁 상품에 많은 키워드가 내 상품명에 없음: **{', '.join(missing)}**")
+            
+            with st.expander("🔍 경쟁 상품명 전체 보기"):
+                for i, t in enumerate(d["titles"], 1):
+                    st.markdown(f"`{i}.` {t} ({len(t)}자)")
 
     # 세부 점수
     st.markdown("### 📊 세부 분석")
@@ -258,7 +342,7 @@ with tab1:
         else:
             with st.spinner("알고리즘 분석 중..."):
                 result = analyze_product_name(product_name.strip(), target_keyword.strip(), category)
-            show_result(result, product_name.strip(), target_keyword.strip())
+            show_result(result, product_name.strip(), target_keyword.strip(), naver_id, naver_secret)
 
 
 # ─────────────────────────────────────────────
@@ -405,7 +489,7 @@ with tab2:
 st.markdown("---")
 st.markdown(
     "<div style='text-align:center; color:#666; font-size:12px;'>"
-    "Algo Hunter MVP v0.2 · 스마트스토어 셀러를 위한 무료 알고리즘 분석 도구"
+    "Algo Hunter v0.3 · 스마트스토어 전용 상품명 최적화 체크리스트 · 실제 경쟁 상품 비교"
     "</div>",
     unsafe_allow_html=True
 )
