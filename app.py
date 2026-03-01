@@ -42,6 +42,7 @@ st.markdown("""
         border-radius: 8px;
         padding: 12px 16px;
         margin: 6px 0;
+        color: #ffffff;
     }
     .suggest-box {
         background: #1b2d1b;
@@ -49,6 +50,7 @@ st.markdown("""
         border-radius: 8px;
         padding: 12px 16px;
         margin: 6px 0;
+        color: #ffffff;
     }
     .tip-box {
         background: #1b1b2d;
@@ -56,6 +58,7 @@ st.markdown("""
         border-radius: 8px;
         padding: 12px 16px;
         margin: 6px 0;
+        color: #ffffff;
     }
     .stProgress > div > div {
         border-radius: 8px;
