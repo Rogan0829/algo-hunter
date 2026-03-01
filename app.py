@@ -91,6 +91,30 @@ st.markdown("---")
 tab1, tab2 = st.tabs(["📊 단일 분석", "⚖️ A/B 비교"])
 
 
+def make_share_text(result, product_name):
+    """공유용 텍스트 생성"""
+    potential = result["potential"]
+    total = result["total_score"]
+    label = result["status_label"]
+    issues_text = "\n".join([f"  ❌ {i}" for i in result["issues"]]) if result["issues"] else "  ✅ 없음"
+    suggest_text = "\n".join([f"  💡 {s}" for s in result["suggestions"][:3]]) if result["suggestions"] else "  ✅ 최적화 완료"
+    
+    return f"""🎯 Algo Hunter 상품명 분석 결과
+
+📦 상품명: {product_name[:40]}{"..." if len(product_name)>40 else ""}
+📊 최적화 잠재력: {potential}% ({label})
+🏅 현재 점수: {total}/100
+
+🚨 발견된 문제:
+{issues_text}
+
+💡 개선 제안:
+{suggest_text}
+
+👉 내 상품명 무료 분석: https://algo-hunter-production.up.railway.app
+(로그인 없이 바로 사용!)"""
+
+
 def show_result(result, product_name, target_keyword):
     """분석 결과 공통 출력 함수"""
     potential = result["potential"]
@@ -105,6 +129,13 @@ def show_result(result, product_name, target_keyword):
         <p style="color: #aaa; margin: 4px 0 0;">{result['potential_desc']}</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    # 공유 버튼
+    share_text = make_share_text(result, product_name)
+    with st.expander("📤 결과 공유하기 (카페/단톡방용)", expanded=False):
+        st.markdown("**아래 텍스트를 복사해서 카페나 단톡방에 공유하세요!**")
+        st.text_area("공유 텍스트", share_text, height=200, key=f"share_{hash(product_name)}")
+        st.caption("💡 텍스트 선택 → Ctrl+A → Ctrl+C 로 전체 복사")
 
     # 세부 점수
     st.markdown("### 📊 세부 분석")
@@ -350,6 +381,24 @@ with tab2:
                         st.markdown(f'<div class="suggest-box">✅ {sug}</div>', unsafe_allow_html=True)
                 if not res_b["issues"] and not res_b["suggestions"]:
                     st.success("개선 사항 없음!")
+            
+            # A/B 비교 공유 텍스트
+            winner_name = name_a.strip() if score_a >= score_b else name_b.strip()
+            winner_score = max(score_a, score_b)
+            loser_score = min(score_a, score_b)
+            ab_share = f"""🎯 Algo Hunter A/B 상품명 비교 결과
+
+🅰️ {name_a.strip()[:35]}
+   → 점수: {score_a}/100 | 잠재력: {res_a['potential']}%
+
+🅱️ {name_b.strip()[:35]}
+   → 점수: {score_b}/100 | 잠재력: {res_b['potential']}%
+
+✅ 승자: {'🅰️ A' if score_a >= score_b else '🅱️ B'} (차이: {abs(score_a-score_b)}점)
+
+👉 내 상품명 무료 분석: https://algo-hunter-production.up.railway.app"""
+            with st.expander("📤 비교 결과 공유하기", expanded=False):
+                st.text_area("공유 텍스트", ab_share, height=180, key="ab_share")
 
 
 # 하단 정보
